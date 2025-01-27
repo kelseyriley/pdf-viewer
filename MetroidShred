@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF Viewer with Navigation</title>
+  <script src="https://mozilla.github.io/pdf.js/build/pdf.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-color: #f4f4f4;
+      height: 100vh;
+    }
+    canvas {
+      border: 1px solid #ddd;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      margin-bottom: 10px;
+    }
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    button {
+      padding: 10px 15px;
+      font-size: 16px;
+      border: none;
+      background-color: #007bff;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    button:disabled {
+      background-color: #aaa;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <button id="prev" disabled>&larr; Previous</button>
+    <span id="page-info">Page <span id="current-page">1</span> of <span id="total-pages">?</span></span>
+    <button id="next">Next &rarr;</button>
+  </div>
+  <canvas id="pdf-render"></canvas>
+
+  <script>
+    // PDF.js setup
+    const url = "https://img1.wsimg.com/blobby/go/543236b8-609b-4af4-a2a8-a28079229a2e/MetroidShred.pdf";
+    let pdfDoc = null,
+        pageNum = 1,
+        pageIsRendering = false,
+        pageNumPending = null;
+    const scale = 1.5, canvas = document.querySelector("#pdf-render"), ctx = canvas.getContext("2d");
+
+    // Render the page
+    const renderPage = num => {
+      pageIsRendering = true;
+      pdfDoc.getPage(num).then(page => {
+        const viewport = page.getViewport({ scale });
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        const renderCtx = { canvasContext: ctx, viewport };
+        page.render(renderCtx).promise.then(() => {
+          pageIsRendering = false;
+          if (pageNumPending !== null) {
+            renderPage(pageNumPending);
+            pageNumPending = null;
+          }
+        });
+
+        // Update page info
+        document.querySelector("#current-page").textContent = num;
+        document.querySelector("#prev").disabled = num <= 1;
+        document.querySelector("#next").disabled = num >= pdfDoc.numPages;
+      });
+    };
+
+    // Check for pending render
+    const queueRenderPage = num => {
+      if (pageIsRendering) {
+        pageNumPending = num;
+      } else {
+        renderPage(num);
+      }
+    };
+
+    // Show previous page
+    const showPrevPage = () => {
+      if (pageNum <= 1) return;
+      pageNum--;
+      queueRenderPage(pageNum);
+    };
+
+    // Show next page
+    const showNextPage = () => {
+      if (pageNum >= pdfDoc.numPages) return;
+      pageNum++;
+      queueRenderPage(pageNum);
+    };
+
+    // Load the PDF
+    pdfjsLib.getDocument(url).promise.then(pdfDoc_ => {
+      pdfDoc = pdfDoc_;
+      document.querySelector("#total-pages").textContent = pdfDoc.numPages;
+      renderPage(pageNum);
+    });
+
+    // Button event listeners
+    document.querySelector("#prev").addEventListener("click", showPrevPage);
+    document.querySelector("#next").addEventListener("click", showNextPage);
+  </script>
+</body>
+</html>
